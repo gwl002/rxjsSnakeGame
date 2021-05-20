@@ -1,0 +1,23 @@
+{
+  "name": "rxjssnakegame",
+  "version": "1.0.0",
+  "description": "A classic game Greedy snake written by rxjs! ",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gwl002/rxjsSnakeGame.git"
+  },
+  "keywords": [
+    "rxjs",
+    "greedySnake"
+  ],
+  "author": "gwl002",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gwl002/rxjsSnakeGame/issues"
+  },
+  "homepage": "https://github.com/gwl002/rxjsSnakeGame#readme"
+}
