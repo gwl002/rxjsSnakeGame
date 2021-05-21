@@ -4,7 +4,9 @@
   "description": "A classic game Greedy snake written by rxjs! ",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "npx webpack --config webpack.config.js",
+    "dev": "npx webpack serve"
   },
   "repository": {
     "type": "git",
@@ -19,5 +21,22 @@
   "bugs": {
     "url": "https://github.com/gwl002/rxjsSnakeGame/issues"
   },
-  "homepage": "https://github.com/gwl002/rxjsSnakeGame#readme"
+  "homepage": "https://github.com/gwl002/rxjsSnakeGame#readme",
+  "dependencies": {
+    "prop-types": "^15.7.2",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.14.3",
+    "@babel/preset-env": "^7.14.2",
+    "@babel/preset-react": "^7.13.13",
+    "@hot-loader/react-dom": "^17.0.1",
+    "babel-loader": "^8.2.2",
+    "html-webpack-plugin": "^5.3.1",
+    "react-hot-loader": "^4.13.0",
+    "webpack": "^5.37.1",
+    "webpack-cli": "^4.7.0",
+    "webpack-dev-server": "^3.11.2"
+  }
 }
