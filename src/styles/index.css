@@ -37,6 +37,18 @@ body,
     box-sizing: border-box;
 }
 
+#board {
+    position: relative;
+}
+
+.center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2000;
+}
+
 @media screen and (max-width: 600px) {
     .container {
         width: 100%;
