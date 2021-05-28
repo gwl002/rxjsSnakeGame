@@ -1,6 +1,6 @@
 import React, { useState, useEffect, memo, useRef, useReducer } from "react";
 import { hot } from "react-hot-loader/root";
-import { range, interval, zip, of, merge, fromEvent, NEVER } from "rxjs";
+import { range, interval, zip, of, merge, fromEvent, NEVER, BehaviorSubject } from "rxjs";
 import { map, filter, scan, startWith, switchMap, tap, withLatestFrom, pluck, distinctUntilChanged, takeWhile, switchMapTo, finalize } from "rxjs/operators";
 import "./styles/index.css";
 import { useMeasure } from "react-use";
@@ -18,6 +18,8 @@ const KEY_OPPOSITE = {
     ArrowRight: "ArrowLeft",
     ArrowLeft: "ArrowRight",
 }
+
+const INTERVAL_TIMES = [300, 200, 100]
 
 
 const createFood = (size, data) => {
@@ -44,6 +46,7 @@ const App = () => {
     const initialState = {
         isPaused: true,
         isGameOver: false,
+        score: 0,
         data: [
             {
                 x: 1, y: 1
@@ -57,16 +60,24 @@ const App = () => {
     useEffect(() => {
         let data = [...initialState.data];
         let food = { ...initialState.food };
+        let score = 0;
+        let isGameOver = false;
+
+        const reset = () => {
+            data = [...initialState.data];
+            food = { ...initialState.food };
+            score = 0;
+            isGameOver = false;
+            setState(state => initialState)
+        }
 
         const pauseClick$ = fromEvent(document.getElementById("pauseORresume"), "click");
 
         const reset$ = fromEvent(document.getElementById("reset"), "click").pipe(
+            startWith(""),
             tap(x => {
-                data = [...initialState.data];
-                food = { ...initialState.food };
-                setState(state => initialState)
+                reset();
             }),
-            startWith("")
         )
 
         const pauseKey$ = fromEvent(document, "keyup").pipe(
@@ -87,6 +98,19 @@ const App = () => {
             startWith("ArrowRight"),
             distinctUntilChanged(),
         )
+
+        const score$ = new BehaviorSubject(0);
+
+        // const inteval$ = score$.pipe(
+        //     filter(score => score % 5 === 0),
+        //     map(score => {
+        //         let level = Math.floor(score / 5);
+        //         level = level >= 2 ? 2 : level;
+        //         return INTERVAL_TIMES[level];
+        //     }),
+        //     switchMap((time) => interval(time)),
+        //     tap(x => { console.log(x) })
+        // )
 
 
         const snake$ = pause$.pipe(
@@ -121,27 +145,32 @@ const App = () => {
                 data.unshift({ x: _x, y: _y })
                 if (food.x === _x && food.y === _y) {
                     food = createFood(size, data);
+                    score = score + 1;
+                    // score$.next(score);
                 } else {
                     data.pop();
                 }
-                const isGameOver = checkGameOver(_x, _y, data, size);
+                isGameOver = checkGameOver(_x, _y, data, size);
                 return {
                     data: [...data],
                     food: food,
-                    isGameOver: isGameOver
+                    isGameOver: isGameOver,
+                    score: score
                 }
             }),
             takeWhile(_state => !_state.isGameOver, false),
             tap((_state) => {
                 setState(state => Object.assign({}, state, _state))
             }),
-            finalize(() => {
-                setState(state => {
-                    return {
-                        ...state,
-                        isGameOver: true
-                    }
-                })
+            finalize((_state) => {
+                if (isGameOver) {
+                    setState(state => {
+                        return {
+                            ...state,
+                            isGameOver: true
+                        }
+                    })
+                }
             })
         )
 
@@ -166,6 +195,7 @@ const App = () => {
             <div>
                 <button id="reset">reset</button>
             </div>
+            <span>{state.score}</span>
         </div>
     )
 }
