@@ -1,10 +1,9 @@
 import React, { useState, useEffect, memo, useRef, useReducer } from "react";
 import { hot } from "react-hot-loader/root";
-import { interval, of, merge, fromEvent, NEVER, BehaviorSubject, combineLatest, Subject, asyncScheduler } from "rxjs";
-import { map, filter, scan, startWith, switchMap, tap, withLatestFrom, pluck, distinctUntilChanged, takeWhile, switchMapTo, finalize, share, skip, shareReplay, observeOn } from "rxjs/operators";
+import { interval, merge, fromEvent, NEVER, BehaviorSubject } from "rxjs";
+import { map, filter, scan, startWith, switchMap, tap, withLatestFrom, pluck, distinctUntilChanged, takeWhile, switchMapTo, finalize } from "rxjs/operators";
 import "./styles/index.css";
 import { useMeasure } from "react-use";
-
 
 const KEY_EVENTS_DIR = [
     "ArrowUp",
@@ -45,123 +44,149 @@ const App = () => {
     const itemWidth = width / size;
 
     const initialState = {
+        isPaused: true,
         isGameOver: false,
         score: 0,
-        snake: [
-
+        data: [
+            {
+                x: 1, y: 1
+            }
         ],
-        food: null,
-        isPaused: true
+        food: createFood(size, [{ x: 1, y: 1 }])
     }
 
     const [state, setState] = useState(initialState);
 
     useEffect(() => {
-        const initFood = createFood(size, []);
+        let data = [...initialState.data];
+        let food = { ...initialState.food };
+        let score = 0;
+        let isGameOver = false;
+
+        const reset = () => {
+            data = [...initialState.data];
+            food = { ...initialState.food };
+            score = 0;
+            isGameOver = false;
+            score$.next(0);
+            setState(state => initialState)
+        }
+
+        const pauseClick$ = fromEvent(document.getElementById("pauseORresume"), "click");
+
+        const reset$ = fromEvent(document.getElementById("reset"), "click").pipe(
+            startWith(""),
+            tap(x => {
+                reset();
+            }),
+        )
+
+        const pauseKey$ = fromEvent(document, "keydown").pipe(
+            pluck("code"),
+            filter((code) => code === "Space")
+        )
+
+        const pause$ = merge(pauseClick$, pauseKey$).pipe(
+            scan((current, prev) => current ? false : true, true),
+            tap((x) => {
+                setState(state => Object.assign({}, state, { isPaused: x }))
+            })
+        );
 
         const dir$ = fromEvent(document, "keydown").pipe(
             pluck("key"),
             filter((key) => KEY_EVENTS_DIR.includes(key)),
             startWith("ArrowRight"),
             distinctUntilChanged(),
-        );
-
-        const pauseClick$ = fromEvent(document.getElementById("pauseORresume"), "click");
-        const pauseKey$ = fromEvent(document, "keydown").pipe(
-            pluck("code"),
-            filter((code) => code === "Space")
-        )
-        const pause$ = merge(pauseClick$, pauseKey$).pipe(
-            startWith(true),
-            scan((current, prev) => current ? false : true, false)
+            tap(x => { console.log("tap key:", x) })
         )
 
-        const eatFood$ = new BehaviorSubject(0);
+        const score$ = new BehaviorSubject(0);
 
-        const score$ = eatFood$.pipe(
-            scan((score, _) => {
-                return score + 1
-            }, -1),
+        const inteval$ = score$.pipe(
+            filter(score => score % 5 === 0),
+            map(score => {
+                let level = Math.floor(score / 5);
+                level = level >= 2 ? 2 : level;
+                return INTERVAL_TIMES[level];
+            }),
+            distinctUntilChanged(),
+            switchMap((time) => interval(time)),
         )
 
         const snake$ = pause$.pipe(
-            switchMap((isPaused) => isPaused ? NEVER : interval(300)),
-            startWith("init"),
-            withLatestFrom(dir$, score$),
+            switchMap((isPaused) => isPaused ? NEVER : inteval$),
+            withLatestFrom(dir$),
             //不能反向
-            scan((prev, [_, dir, score]) => {
-                if (KEY_OPPOSITE[dir] === prev[0]) {
-                    return [prev[0], score]
+            scan((prev, [_, dir]) => {
+                if (KEY_OPPOSITE[dir] === prev) {
+                    return prev
                 }
-                return [dir, score]
-            }, []),
-            scan((snake, [dir, score]) => {
-                const eatFood = snake.length <= score
-                let head = snake[0];
+                return dir
+            }, ""),
+            map((dir) => {
+                let head = data[0];
                 let _x = head.x;
                 let _y = head.y;
+
                 switch (dir) {
                     case "ArrowRight":
-                        _x = _x >= size - 1 ? 0 : _x + 1;
+                        _x += 1;
                         break;
                     case "ArrowLeft":
-                        _x = _x <= 0 ? size - 1 : _x - 1;
+                        _x -= 1;
                         break;
                     case "ArrowUp":
-                        _y = _y <= 0 ? size - 1 : _y - 1;
+                        _y -= 1;
                         break;
                     case "ArrowDown":
-                        _y = _y >= size - 1 ? 0 : _y + 1;
+                        _y += 1
                         break;
                 }
-                snake.unshift({ x: _x, y: _y });
-                if (!eatFood) {
-                    snake.pop();
+                data.unshift({ x: _x, y: _y })
+                if (food.x === _x && food.y === _y) {
+                    food = createFood(size, data);
+                    score = score + 1;
+                    score$.next(score);
+                } else {
+                    data.pop();
                 }
-                return [...snake];
-            }, [{ x: 1, y: 1 }]),
-            shareReplay(1),
-        );
-
-        const food$ = snake$.pipe(
-            scan((food, snake) => {
-                let head = snake[0];
-                if (head.x === food.x && head.y === food.y) {
-                    return createFood(size, snake)
-                }
-                return food;
-            }, initFood),
-            startWith(initFood),
-            distinctUntilChanged(),
-            shareReplay(1)
-        )
-
-        const game$ = combineLatest([snake$, pause$, food$, score$])
-
-        food$.subscribe(x => {
-            eatFood$.next(1)
-        })
-
-        game$.subscribe(([snake, isPaused, food, score]) => {
-            console.log("startGame")
-            setState(state => {
+                isGameOver = checkGameOver(_x, _y, data, size);
                 return {
-                    ...state,
-                    snake,
-                    isPaused,
-                    food,
-                    score
+                    data: [...data],
+                    food: food,
+                    isGameOver: isGameOver,
+                    score: score
+                }
+            }),
+            takeWhile(_state => !_state.isGameOver, false),
+            tap((_state) => {
+                setState(state => Object.assign({}, state, _state))
+            }),
+            finalize((_state) => {
+                if (isGameOver) {
+                    setState(state => {
+                        return {
+                            ...state,
+                            isGameOver: true
+                        }
+                    })
                 }
             })
-        })
+        )
+
+        const game$ = reset$.pipe(
+            switchMapTo(snake$)
+        )
+
+        game$.subscribe()
 
     }, [])
-
 
     return (
         <div className="container" ref={ref}>
             <Board winWidth={width} size={size} isGameOver={state.isGameOver} />
-            <Snake itemWidth={itemWidth} data={state.snake} />
+            <Snake itemWidth={itemWidth} data={state.data} />
             <Food itemWidth={itemWidth} food={state.food} />
             <div>
                 <button id="pauseORresume">{
